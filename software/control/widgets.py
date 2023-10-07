@@ -967,7 +967,7 @@ class MultiPointWidget(QFrame):
 
         grid_af = QVBoxLayout()
         grid_af.addWidget(self.checkbox_withAutofocus)
-        grid_af.addWidget(self.checkbox_stitchTiles)
+        #grid_af.addWidget(self.checkbox_stitchTiles)
         if SUPPORT_LASER_AUTOFOCUS:
             grid_af.addWidget(self.checkbox_withReflectionAutofocus)
 
