@@ -8,6 +8,9 @@ from qtpy.QtCore import *
 from qtpy.QtWidgets import *
 from qtpy.QtGui import *
 
+from control.processing_handler import ProcessingHandler, default_upload_fn, default_process_fn
+from control.stitcher import Stitcher, default_image_reader
+
 import control.utils as utils
 from control._def import *
 import control.tracking as tracking
@@ -1069,6 +1072,7 @@ class MultiPointWorker(QObject):
         QObject.__init__(self)
         self.multiPointController = multiPointController
 
+        self.processingHandler = multiPointController.processingHandler
         self.camera = self.multiPointController.camera
         self.microcontroller = self.multiPointController.microcontroller
         self.usb_spectrometer = self.multiPointController.usb_spectrometer
@@ -1323,6 +1327,12 @@ class MultiPointWorker(QObject):
                                     image_to_display = utils.crop_image(image,round(self.crop_width*self.display_resolution_scaling), round(self.crop_height*self.display_resolution_scaling))
                                     self.image_to_display.emit(image_to_display)
                                     self.image_to_display_multi.emit(image_to_display,config.illumination_source)
+                                    stitcher_tile_path = None
+                                    stitcher_of_interest = None
+                                    stitcher_key = str(config.name)+"_Z_"+str(k)
+                                    stitcher_tiled_file_path = os.path.join(current_path, "stitch_input_"+str(config.name).replace(' ','_')+"_Z_"+str(k)+'.tiff') 
+                                    stitcher_stitched_file_path = os.path.join(current_path,"stitch_output_"+str(config.name).replace(' ','_')+"_Z_"+str(k)+'.ome.tiff')
+                                    stitcher_default_options = {'align_channel':0,'maximum_shift':int(min(self.crop_width,self.crop_height)*0.05),'filter_sigma':1} # add to UI later
                                     if image.dtype == np.uint16:
                                         saving_path = os.path.join(current_path, file_ID + '_' + str(config.name).replace(' ','_') + '.tiff')
                                         if self.camera.is_color:
@@ -1332,6 +1342,7 @@ class MultiPointWorker(QObject):
                                                 elif MULTIPOINT_BF_SAVING_OPTION == 'Green Channel Only':
                                                     image = image[:,:,1]
                                         iio.imwrite(saving_path,image)
+                                        stitcher_tile_path = saving_path
                                     else:
                                         saving_path = os.path.join(current_path, file_ID + '_' + str(config.name).replace(' ','_') + '.' + Acquisition.IMAGE_FORMAT)
                                         if self.camera.is_color:
@@ -1345,7 +1356,28 @@ class MultiPointWorker(QObject):
                                             else:
                                                 image = cv2.cvtColor(image,cv2.COLOR_RGB2BGR)
                                         cv2.imwrite(saving_path,image)
-                                    
+                                        stitcher_tile_path = saving_path
+                                    if self.multiPointController.do_stitch_tiles:
+                                        try:
+                                            stitcher_of_interest = self.multiPointController.tile_stitchers[stitcher_key]
+                                        except:
+                                            self.multiPointController.tile_stitchers[stitcher_key] = Stitcher(stitcher_tiled_file_path, stitcher_stitched_file_path, stitcher_default_options, auto_run_ashlar=True, image_reader = self.multiPointController.stitcher_image_reader)
+                                            stitcher_of_interest = self.multiPointController.tile_stitchers[stitcher_key]
+                                            stitcher_of_interest.start_ometiff_writer()
+                                        tile_metadata = {
+                                                'Pixels': {
+                                                    'PhysicalSizeX': 1, # need to get microscope info for actual values for these, if they are necessary
+                                                    'PhysicalSizeXUnit': 'μm',
+                                                    'PhysicalSizeY': 1,
+                                                    'PhysicalSizeYUnit': 'μm',
+                                                    },
+                                                'Plane': {
+                                                    'PositionX':int((j if self.x_scan_direction==1 else self.NX-1-j)*self.crop_width),
+                                                    'PositionY':int(i*self.crop_height)
+                                                    }
+                                                }
+                                        stitcher_of_interest.add_tile(stitcher_tile_path, tile_metadata)
+
                                     if config.name == 'BF LED matrix left half':
                                         I_left = np.copy(image)
                                     elif config.name == 'BF LED matrix right half':
@@ -1363,32 +1395,19 @@ class MultiPointWorker(QObject):
                                             np.savetxt(saving_path,data,delimiter=',')
 
                             # real time processing 
-                            if I_fluorescence is not None and I_left is not None and I_fluorescence is not None:
-                                '''
-                                if True: # testing mode
-                                    I_fluorescence = imageio.v2.imread('/home/cephla/Documents/tmp/1_1_0_Fluorescence_405_nm_Ex.bmp')
+
+                            if I_fluorescence is not None and I_left is not None and I_right is not None:
+                                if False: # testing mode
+                                    I_fluorescence = imageio.v2.imread('/home/prakashlab/Documents/tmp/1_1_0_Fluorescence_405_nm_Ex.bmp')
                                     I_fluorescence = I_fluorescence[:,:,::-1]
-                                    I_left = imageio.v2.imread('/home/cephla/Documents/tmp/1_1_0_BF_LED_matrix_left_half.bmp')
-                                    I_right = imageio.v2.imread('/home/cephla/Documents/tmp/1_1_0_BF_LED_matrix_right_half.bmp')
-                                '''
-                                print(self.microscope)
-                                # process fov
-                                I,score = process_fov(I_fluorescence,I_left,I_right,self.microscope.model,self.microscope.device,self.microscope.classification_th)
-                                print(I.shape)
-
-                                # display
-                                if len(I>0):
-                                    images = I*255
-                                    score_df = pd.DataFrame(score, columns=["output"])
-
-                                    if self.microscope.dataHandler.images is None:
-                                        #annotation_pd = pd.read_csv('/home/octopi/Documents/tmp/score.csv',index_col='index')
-                                        #images = np.load('/home/octopi/Documents/tmp/test.npy')
-                                        self.microscope.dataHandler.load_images(images)
-                                        self.microscope.dataHandler.load_predictions(score_df)
-                                    else:
-                                        self.microscope.dataHandler.add_data(images,score_df)
-
+                                    I_left = imageio.v2.imread('/home/prakashlab/Documents/tmp/1_1_0_BF_LED_matrix_left_half.bmp')
+                                    I_right = imageio.v2.imread('/home/prakashlab/Documents/tmp/1_1_0_BF_LED_matrix_right_half.bmp')
+                                processing_fn = default_process_fn
+                                processing_args = [process_fov, I_fluorescence.copy(),I_left.copy(), I_right.copy(), self.microscope.model, self.microscope.device, self.microscope.classification_th]
+                                processing_kwargs = {'upload_fn':default_upload_fn, 'dataHandler':self.microscope.dataHandler}
+                                task_dict = {'function':processing_fn, 'args':processing_args, 'kwargs':processing_kwargs}
+                                self.processingHandler.processing_queue.put(task_dict)    
+                          
                             # add the coordinate of the current location
                             new_row = pd.DataFrame({'i':[i],'j':[self.NX-1-j],'k':[k],
                                                     'x (mm)':[self.navigationController.x_pos_mm],
@@ -1506,10 +1525,13 @@ class MultiPointController(QObject):
     signal_current_configuration = Signal(Configuration)
     signal_register_current_fov = Signal(float,float)
 
-    def __init__(self,camera,navigationController,liveController,autofocusController,configurationManager,usb_spectrometer=None,scanCoordinates=None,parent=None):
+    def __init__(self,camera,navigationController,liveController,autofocusController,configurationManager,usb_spectrometer=None,scanCoordinates=None,parent=None, stitcher_image_reader =default_image_reader):
         QObject.__init__(self)
 
         self.camera = camera
+        self.stitcher_image_reader = stitcher_image_reader
+        self.tile_stitchers = {}
+        self.processingHandler = ProcessingHandler()
         self.microcontroller = navigationController.microcontroller # to move to gui for transparency
         self.navigationController = navigationController
         self.liveController = liveController
@@ -1531,6 +1553,7 @@ class MultiPointController(QObject):
         self.deltat = 0
         self.do_autofocus = False
         self.do_reflection_af = False
+        self.do_stitch_tiles = False
         self.crop_width = Acquisition.CROP_WIDTH
         self.crop_height = Acquisition.CROP_HEIGHT
         self.display_resolution_scaling = Acquisition.IMAGE_DISPLAY_SCALING_FACTOR
@@ -1570,7 +1593,8 @@ class MultiPointController(QObject):
         self.do_autofocus = flag
     def set_reflection_af_flag(self,flag):
         self.do_reflection_af = flag
-
+    def set_stitch_tiles_flag(self, flag):
+        self.do_stitch_tiles = flag
     def set_crop(self,crop_width,height):
         self.crop_width = crop_width
         self.crop_height = crop_height
@@ -1598,6 +1622,7 @@ class MultiPointController(QObject):
         
     def run_acquisition(self, location_list=None): # @@@ to do: change name to run_experiment
         print('start multipoint')
+        self.tile_stitchers = {}
         print(str(self.Nt) + '_' + str(self.NX) + '_' + str(self.NY) + '_' + str(self.NZ))
         if location_list is not None:
             print(location_list)
@@ -1634,6 +1659,8 @@ class MultiPointController(QObject):
         # create a QThread object
         self.thread = QThread()
         # create a worker object
+        self.processingHandler.start_processing()
+        self.processingHandler.start_uploading()
         self.multiPointWorker = MultiPointWorker(self)
         # move the worker to the thread
         self.multiPointWorker.moveToThread(self.thread)
@@ -1654,6 +1681,9 @@ class MultiPointController(QObject):
 
     def _on_acquisition_completed(self):
         # restore the previous selected mode
+        if self.do_stitch_tiles:
+            for k in self.tile_stitchers.keys():
+                self.tile_stitchers[k].all_tiles_added()
         self.signal_current_configuration.emit(self.configuration_before_running_multipoint)
 
         # re-enable callback
@@ -1670,6 +1700,7 @@ class MultiPointController(QObject):
                 self.usb_spectrometer.resume_streaming()
         
         # emit the acquisition finished signal to enable the UI
+        self.processingHandler.end_processing()
         self.acquisitionFinished.emit()
         QApplication.processEvents()
 
