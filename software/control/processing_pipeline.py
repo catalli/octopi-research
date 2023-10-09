@@ -16,7 +16,7 @@ parameters['crop_x1'] = 2900
 parameters['crop_y0'] = 100
 parameters['crop_y1'] = 2900
 
-def process_fov(I_fluorescence,I_BF_left,I_BF_right,model,device,classification_th):
+def process_fov(I_fluorescence,I_BF_left,I_BF_right,model,device,classification_th, batch_size_inference=2048):
 
     # crop image
     I_fluorescence = I_fluorescence[ parameters['crop_y0']:parameters['crop_y1'], parameters['crop_x0']:parameters['crop_x1'], : ]
@@ -45,7 +45,7 @@ def process_fov(I_fluorescence,I_BF_left,I_BF_right,model,device,classification_
     I = I.transpose(0, 3, 1, 2)
 
     # classify
-    prediction_score = run_model(model,device,I)[:,1]
+    prediction_score = run_model(model,device,I, batch_size_inference=batch_size_inference)[:,1]
     indices = np.where(prediction_score > classification_th)[0]
 
     # return positive spots
