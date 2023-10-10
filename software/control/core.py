@@ -1397,7 +1397,7 @@ class MultiPointWorker(QObject):
                             # real time processing 
 
                             if I_fluorescence is not None and I_left is not None and I_right is not None:
-                                if False: # testing mode
+                                if True: # testing mode
                                     I_fluorescence = imageio.v2.imread('/home/prakashlab/Documents/tmp/1_1_0_Fluorescence_405_nm_Ex.bmp')
                                     I_fluorescence = I_fluorescence[:,:,::-1]
                                     I_left = imageio.v2.imread('/home/prakashlab/Documents/tmp/1_1_0_BF_LED_matrix_left_half.bmp')
@@ -1406,7 +1406,12 @@ class MultiPointWorker(QObject):
                                 processing_args = [process_fov, I_fluorescence.copy(),I_left.copy(), I_right.copy(), self.microscope.model, self.microscope.device, self.microscope.classification_th]
                                 processing_kwargs = {'upload_fn':default_upload_fn, 'dataHandler':self.microscope.dataHandler}
                                 task_dict = {'function':processing_fn, 'args':processing_args, 'kwargs':processing_kwargs}
-                                self.processingHandler.processing_queue.put(task_dict)    
+                                self.processingHandler.processing_queue.put(task_dict)
+                                print("Enqueued processing task, currently "+str(self.processingHandler.processing_queue.qsize())+" tasks in queue")
+                                print ("Currently "+str(self.processingHandler.upload_queue.qsize())+" tasks in upload queue")
+                                #process_result = default_process_fn(*processing_args, **processing_kwargs)
+                                #print("ran classification")
+                                #process_result['function'](*process_result['args'], **process_result['kwargs'])
                           
                             # add the coordinate of the current location
                             new_row = pd.DataFrame({'i':[i],'j':[self.NX-1-j],'k':[k],
