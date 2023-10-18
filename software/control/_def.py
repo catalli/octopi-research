@@ -441,10 +441,10 @@ if config_files:
     for var_name in var_items:
         if type(locals()[var_name]) is type:
             continue
-        var_name_lower = var_name.lower()
-        if var_name_lower not in cfp.items("GENERAL"):
+        varnamelower = var_name.lower()
+        if varnamelower not in cfp.options("GENERAL"):
             continue
-        value = cfp.get("GENERAL", var_name_lower)
+        value = cfp.get("GENERAL",varnamelower)
         actualvalue = conf_attribute_reader(value)
         locals()[var_name] = actualvalue
     for classkey in var_items:
