@@ -437,11 +437,16 @@ if config_files:
     #exec(open(config_files[0]).read())
     cfp = ConfigParser()
     cfp.read(config_files[0])
-    for option, value in cfp.items("GENERAL"):
-        var_name = option.upper()
+    var_items = list(locals().keys())
+    for var_name in var_items:
+        if type(locals()[var_name]) is type:
+            continue
+        var_name_lower = var_name.lower()
+        if var_name_lower not in cfp.items("GENERAL"):
+            continue
+        value = cfp.get("GENERAL", var_name_lower)
         actualvalue = conf_attribute_reader(value)
         locals()[var_name] = actualvalue
-    var_items = list(locals().keys())
     for classkey in var_items:
         myclass = None
         classkeyupper = classkey.upper()
