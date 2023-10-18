@@ -375,8 +375,8 @@ class OctopiGUI(QMainWindow):
             dummy_input = dummy_input.cuda()
         _ = self.model(dummy_input)
 
-        #model_path = 'models/m2unet_model_flat_erode1_wdecay5_smallbatch/model_4000_11.pth'
-        segmentation_model_path=SEGMENTATION_MODEL_PATH
+        segmentation_model_path = 'models/m2unet_model_flat_erode1_wdecay5_smallbatch/model_4000_11.pth'
+        #segmentation_model_path=SEGMENTATION_MODEL_PATH
         assert os.path.exists(segmentation_model_path)
         use_trt_segmentation=USE_TRT_SEGMENTATION
         self.segmentation_model = m2u(pretrained_model=segmentation_model_path, use_trt=use_trt_segmentation)
