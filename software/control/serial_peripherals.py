@@ -252,7 +252,9 @@ class LDI:
     def set_intensity(self,channel,intensity):
         channel = str(channel)
         intensity = "{:.2f}".format(intensity)
+        print('set:'+channel+'='+intensity+'\r')
         self.serial_connection.write_and_check('set:'+channel+'='+intensity+'\r',"ok")
+        print('active channel: ' + str(self.active_channel))
     
     def set_shutter(self,channel,state):
         channel = str(channel)
@@ -264,8 +266,10 @@ class LDI:
 
     def set_active_channel(self,channel):
         self.active_channel = channel
+        print('[set active channel to ' + str(channel) + ']')
 
     def set_active_channel_shutter(self,state):
         channel = str(self.active_channel)
         state = str(state)
+        print('shutter:'+channel+'='+state+'\r')
         self.serial_connection.write_and_check('shutter:'+channel+'='+state+'\r',"ok")
