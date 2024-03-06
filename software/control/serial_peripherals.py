@@ -73,7 +73,7 @@ class SerialDevice:
                 self.serial = serial.Serial(self.port,**kwargs)
 
 
-    def write_and_check(self, command, expected_response, max_attempts=3, attempt_delay=1, check_prefix=True):
+    def write_and_check(self, command, expected_response, max_attempts=8, attempt_delay=1, check_prefix=True):
         # Write a command and check the response
         for attempt in range(max_attempts):
             self.serial.write(command.encode())
@@ -145,13 +145,13 @@ class XLight_Simulation:
 
 class XLight:
     """Wrapper for communicating with CrestOptics X-Light devices over serial"""
-    def __init__(self, SN="A106QADU"):
+    def __init__(self, SN="AB0PKT2R"):
         """
         Provide serial number (default is that of the device
         cephla already has) for device-finding purposes. Otherwise, all
         XLight devices should use the same serial protocol
         """
-        self.serial_connection = SerialDevice(SN=SN,baudrate=9600,
+        self.serial_connection = SerialDevice(SN=SN,baudrate=115200,
                 bytesize=serial.EIGHTBITS,stopbits=serial.STOPBITS_ONE,
                 parity=serial.PARITY_NONE, 
                 xonxoff=False,rtscts=False,dsrdtr=False)
@@ -170,9 +170,12 @@ class XLight:
         return self.emission_wheel_pos
 
     def get_emission_filter(self):
+    	pass
+    	'''
         current_pos = self.serial_connection.write_and_check("rB\r","rB")
         self.emission_wheel_pos = int(current_pos[2])
         return self.emission_wheel_pos
+        '''
 
     def set_dichroic(self, position,extraction=False):
         if str(position) not in ["1","2","3","4","5"]:
@@ -188,9 +191,12 @@ class XLight:
 
 
     def get_dichroic(self):
+    	pass
+    	'''
         current_pos = self.serial_connection.write_and_check("rC\r","rC")
         self.dichroic_wheel_pos = int(current_pos[2])
         return self.dichroic_wheel_pos
+        '''
 
 
     def set_disk_position(self,position):
@@ -210,9 +216,12 @@ class XLight:
         return self.spinning_disk_pos
 
     def get_disk_position(self):
+    	pass
+    	'''
         current_pos = self.serial_connection.write_and_check("rD\r","rD")
         self.spinning_disk_pos = int(current_pos[2])
         return self.spinning_disk_pos
+        '''
 
     def set_disk_motor_state(self, state):
         """Set True for ON, False for OFF"""
@@ -252,7 +261,9 @@ class LDI:
     def set_intensity(self,channel,intensity):
         channel = str(channel)
         intensity = "{:.2f}".format(intensity)
+        print('set:'+channel+'='+intensity+'\r')
         self.serial_connection.write_and_check('set:'+channel+'='+intensity+'\r',"ok")
+        print('active channel: ' + str(self.active_channel))
     
     def set_shutter(self,channel,state):
         channel = str(channel)
@@ -264,8 +275,10 @@ class LDI:
 
     def set_active_channel(self,channel):
         self.active_channel = channel
+        print('[set active channel to ' + str(channel) + ']')
 
     def set_active_channel_shutter(self,state):
         channel = str(self.active_channel)
         state = str(state)
+        print('shutter:'+channel+'='+state+'\r')
         self.serial_connection.write_and_check('shutter:'+channel+'='+state+'\r',"ok")

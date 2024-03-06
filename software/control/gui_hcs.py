@@ -94,10 +94,14 @@ class OctopiGUI(QMainWindow):
         else:
             if ENABLE_SPINNING_DISK_CONFOCAL:
                 self.xlight = serial_peripherals.XLight()
+            if USE_LDI_SERIAL_CONTROL:
+                self.ldi = serial_peripherals.LDI()
+                self.ldi.run()
             if True:
                 if SUPPORT_LASER_AUTOFOCUS:
                     sn_camera_main = camera.get_sn_by_model(MAIN_CAMERA_MODEL)
                     sn_camera_focus = camera_fc.Camera_Simulation(FOCUS_CAMERA_MODEL)
+                    # self.camera = camera.Camera(sn=sn_camera_main,resolution=(3104,2084),rotate_image_angle=ROTATE_IMAGE_ANGLE,flip_image=FLIP_IMAGE)
                     self.camera = camera.Camera(sn=sn_camera_main,resolution=(3104,2084),rotate_image_angle=ROTATE_IMAGE_ANGLE,flip_image=FLIP_IMAGE)
                     self.camera.open()
                     self.camera_focus = camera_fc.Camera_Simulation(sn=sn_camera_focus)
@@ -126,10 +130,11 @@ class OctopiGUI(QMainWindow):
         # configure the actuators
         self.microcontroller.configure_actuators()
 
-        self.configurationManager = core.ConfigurationManager(filename='./channel_configurations.xml')
+        self.configurationManager = core.ConfigurationManager(filename='./channel_configurations123.xml')
+        print('load channel_configurations123.xml')
 
         self.streamHandler = core.StreamHandler(display_resolution_scaling=DEFAULT_DISPLAY_CROP/100)
-        self.liveController = core.LiveController(self.camera,self.microcontroller,self.configurationManager)
+        self.liveController = core.LiveController(self.camera,self.microcontroller,self.configurationManager,self)
         self.navigationController = core.NavigationController(self.microcontroller)
         self.slidePositionController = core.SlidePositionController(self.navigationController,self.liveController,is_for_wellplate=True)
         self.autofocusController = core.AutoFocusController(self.camera,self.navigationController,self.liveController)
@@ -140,75 +145,7 @@ class OctopiGUI(QMainWindow):
         self.imageSaver = core.ImageSaver()
         self.imageDisplay = core.ImageDisplay()
         self.navigationViewer = core.NavigationViewer(sample=str(WELLPLATE_FORMAT)+' well plate')
-        '''
-        if HOMING_ENABLED_Z:
-            # retract the objective
-            self.navigationController.home_z()
-            # wait for the operation to finish
-            t0 = time.time()
-            while self.microcontroller.is_busy():
-                time.sleep(0.005)
-                if time.time() - t0 > 10:
-                    print('z homing timeout, the program will exit')
-                    exit()
-            print('objective retracted')
 
-        if HOMING_ENABLED_Z and HOMING_ENABLED_X and HOMING_ENABLED_Y:
-            # self.navigationController.set_x_limit_pos_mm(100)
-            # self.navigationController.set_x_limit_neg_mm(-100)
-            # self.navigationController.set_y_limit_pos_mm(100)
-            # self.navigationController.set_y_limit_neg_mm(-100)
-            # self.navigationController.home_xy() 
-            # for the new design, need to home y before home x; x also needs to be at > + 10 mm when homing y
-            self.navigationController.move_x(12)
-            while self.microcontroller.is_busy(): # to do, add a blocking option move_x()
-                time.sleep(0.005)
-
-            self.navigationController.home_y()
-            t0 = time.time()
-            while self.microcontroller.is_busy():
-                time.sleep(0.005)
-                if time.time() - t0 > 10:
-                    print('y homing timeout, the program will exit')
-                    exit()
-
-            self.navigationController.home_x()
-            t0 = time.time()
-            while self.microcontroller.is_busy():
-                time.sleep(0.005)
-                if time.time() - t0 > 10:
-                    print('x homing timeout, the program will exit')
-                    exit()
-
-            print('xy homing completed')
-
-            # move to (20 mm, 20 mm)
-            self.navigationController.move_x(20)
-            while self.microcontroller.is_busy():
-                time.sleep(0.005)
-            self.navigationController.move_y(20)
-            while self.microcontroller.is_busy():
-                time.sleep(0.005)
-
-            self.navigationController.set_x_limit_pos_mm(SOFTWARE_POS_LIMIT.X_POSITIVE)
-            self.navigationController.set_x_limit_neg_mm(SOFTWARE_POS_LIMIT.X_NEGATIVE)
-            self.navigationController.set_y_limit_pos_mm(SOFTWARE_POS_LIMIT.Y_POSITIVE)
-            self.navigationController.set_y_limit_neg_mm(SOFTWARE_POS_LIMIT.Y_NEGATIVE)
-            self.navigationController.set_z_limit_pos_mm(SOFTWARE_POS_LIMIT.Z_POSITIVE)
-
-        if HOMING_ENABLED_Z:
-            # move the objective back
-            self.navigationController.move_z(DEFAULT_Z_POS_MM)
-            # wait for the operation to finish
-            t0 = time.time() 
-            while self.microcontroller.is_busy():
-                time.sleep(0.005)
-                if time.time() - t0 > 5:
-                    print('z return timeout, the program will exit')
-                    exit()
-        '''
-        
-        '''
         # retract the objective
         self.navigationController.home_z()
         # wait for the operation to finish
@@ -265,7 +202,6 @@ class OctopiGUI(QMainWindow):
             if time.time() - t0 > 5:
                 print('z return timeout, the program will exit')
                 exit()
-        '''
 	
         # open the camera
         # camera start streaming
@@ -404,7 +340,7 @@ class OctopiGUI(QMainWindow):
             # controllers
             self.configurationManager_focus_camera = core.ConfigurationManager(filename='./focus_camera_configurations.xml')
             self.streamHandler_focus_camera = core.StreamHandler()
-            self.liveController_focus_camera = core.LiveController(self.camera_focus,self.microcontroller,self.configurationManager_focus_camera,control_illumination=False,for_displacement_measurement=True)
+            self.liveController_focus_camera = core.LiveController(self.camera_focus,self.microcontroller,self.configurationManager_focus_camera,self,control_illumination=False,for_displacement_measurement=True)
             self.multipointController = core.MultiPointController(self.camera,self.navigationController,self.liveController,self.autofocusController,self.configurationManager,scanCoordinates=self.scanCoordinates,parent=self)
             self.imageDisplayWindow_focus = core.ImageDisplayWindow(draw_crosshairs=True)
             self.displacementMeasurementController = core_displacement_measurement.DisplacementMeasurementController()
